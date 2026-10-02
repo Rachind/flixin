@@ -1,5 +1,10 @@
 {
   "appId": "com.tima.flixin",
   "appName": "FlixIn",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK"
+    }
+  }
 }
