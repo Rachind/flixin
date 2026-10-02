@@ -155,7 +155,7 @@ button{font-family:inherit;}
 /* ---------- Tuning ---------- */
 #tuning-ship-canvas{display:block; margin:0 auto 6px; image-rendering:pixelated;}
 #tuning-ship-name{font-family:var(--px-font); font-size:14px; color:var(--teal); margin-bottom:16px;}
-#tuning-rows{width:min(100%,380px); display:flex; flex-direction:column; gap:10px; padding-bottom:20px;}
+#tuning-rows, #tuning-appearance-rows{width:min(100%,380px); display:flex; flex-direction:column; gap:10px; padding-bottom:20px;}
 .upgrade-row{background:var(--panel); border:2px solid var(--panel-b); padding:10px 14px; box-shadow:2px 2px 0 rgba(0,0,0,.35);}
 .upgrade-row-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
 .upgrade-name{font-family:var(--px-font); font-size:10px; color:var(--text);}
@@ -170,6 +170,7 @@ button{font-family:inherit;}
 .ship-card .tuning-tag{font-family:var(--px-font); font-size:7px; color:var(--gold); text-transform:uppercase; letter-spacing:.5px; margin-top:4px;}
 .tuning-section-title{width:min(100%,380px); font-family:var(--px-font); font-size:11px; color:var(--gold); margin:4px 0 10px; letter-spacing:.5px;}
 .upgrade-row.appearance-row{display:flex; justify-content:space-between; align-items:center; gap:10px;}
+.appearance-row > div{flex:1; min-width:0; overflow-wrap:break-word; hyphens:auto;}
 .upgrade-desc{font-family:var(--px-body); font-size:14px; color:var(--dim); margin-top:2px;}
 .upgrade-row.appearance-row.owned{border-color:var(--gold);}
 .appearance-btn{
@@ -256,7 +257,14 @@ button{font-family:inherit;}
 }
 .stepper button.active{border-color:var(--teal); background:#123c39; color:var(--teal); box-shadow:2px 2px 0 var(--teal);}
 .bots-hint{font-family:var(--px-body); font-size:13px; color:var(--dim); margin-top:2px;}
-#pvp-diff-stepper button{width:auto; height:auto; padding:8px 9px; font-size:9px;}
+.px-select{
+  appearance:none; -webkit-appearance:none; border-radius:0; border:2px solid var(--teal); background-color:#123c39;
+  color:var(--teal); font-family:var(--px-font); font-size:10px; padding:9px 30px 9px 10px; cursor:pointer;
+  box-shadow:2px 2px 0 var(--teal);
+  background-image:linear-gradient(45deg, transparent 50%, var(--teal) 50%), linear-gradient(-45deg, transparent 50%, var(--teal) 50%);
+  background-position:right 15px center, right 10px center; background-size:5px 5px; background-repeat:no-repeat;
+}
+.px-select option{background:#141b2b; color:var(--text);}
 
 /* ---------- Sub screens (hangar / track select / editor) ---------- */
 .sub-header{

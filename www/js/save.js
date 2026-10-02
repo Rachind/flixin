@@ -12,7 +12,7 @@ function defaultSave(){
     stats:{ totalRaces:0, totalDistance:0, totalCreditsEarned:0, totalObstaclesDestroyed:0,
             totalOvertakes:0, totalNearMisses:0, wins:0, raceCountByShip:{}, arenaWins:0, arenaWinStreak:0 },
     achievements:[], dailyChallenge:null, upgrades:{}, appearance:{}, hullColor:{}, claimedGifts:[],
-    pvpDifficulty:'normal',
+    pvpDifficulty:'normal', pvpArenaSize:'medium',
   };
 }
 let SAVE = defaultSave();

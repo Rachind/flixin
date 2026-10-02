@@ -1,7 +1,13 @@
 "use strict";
 
 /* ---------------- Arena (PvP duel) ---------------- */
-const ARENA_HALF = 260;           // half-side of the square arena, world units
+// Arena size presets (half-side of the square arena, world units); the camera always fits the whole arena
+const ARENA_SIZES = {
+  small:  { label:'Малая',   half:200 },
+  medium: { label:'Средняя', half:260 },
+  large:  { label:'Большая', half:340 },
+};
+let arenaHalf = ARENA_SIZES.medium.half;
 const ARENA_WIN_HITS = 5;         // hits needed to win a duel
 const ARENA_BULLET_SPEED = 900;
 const ARENA_BULLET_LIFE = 1.1;
@@ -66,6 +72,7 @@ function resetRace(){
     const rival = makeShip(false, rivalSkin, PVP_RIVAL_NAME);
     rival.isRival = true;
     arenaDiff = PVP_DIFFICULTIES[SAVE.pvpDifficulty] || PVP_DIFFICULTIES.normal;
+    arenaHalf = (ARENA_SIZES[SAVE.pvpArenaSize] || ARENA_SIZES.medium).half;
     rival.aiSpeedVar = arenaDiff.speedVar;
     aiShips.push(rival);
   } else for(let i=0;i<SAVE.bots;i++){
@@ -77,7 +84,7 @@ function resetRace(){
   if(raceMode==='pvp'){
     // square-arena duel: start on opposite sides, facing each other
     arenaBullets = [];
-    const d = ARENA_HALF*0.62;
+    const d = arenaHalf*0.62;
     player.x = -d; player.y = 0; player.heading = 0; player.speed = 0;
     player.finished=false; player.trickScore=0; player.arenaScore=0;
     player.fireCooldown=0; player.hitFlash=0; player.shieldTime=0; player.boostTime=0;
@@ -155,7 +162,7 @@ function updateArenaShip(dt){
 
   let nx = player.x + Math.cos(player.heading)*player.speed*dt;
   let ny = player.y + Math.sin(player.heading)*player.speed*dt;
-  const lim = ARENA_HALF - SHIP_RADIUS*1.2;
+  const lim = arenaHalf - SHIP_RADIUS*1.2;
   let hitWall=false;
   if(nx<-lim||nx>lim){ nx=clamp(nx,-lim,lim); hitWall=true; }
   if(ny<-lim||ny>lim){ ny=clamp(ny,-lim,lim); hitWall=true; }
@@ -228,13 +235,13 @@ function updateArenaAI(sh, dt){
 
   let nx = sh.x + mx*sh.speed*dt;
   let ny = sh.y + my*sh.speed*dt;
-  const lim = ARENA_HALF - SHIP_RADIUS*1.2;
+  const lim = arenaHalf - SHIP_RADIUS*1.2;
   nx = clamp(nx,-lim,lim);
   ny = clamp(ny,-lim,lim);
   sh.x = nx; sh.y = ny;
 
   sh.fireCooldown -= dt;
-  if(sh.fireCooldown<=0 && dist < ARENA_HALF*2.6){
+  if(sh.fireCooldown<=0 && dist < arenaHalf*2.6){
     fireArenaBullet(sh, angToPlayer + (Math.random()-0.5)*arenaDiff.spread);
     sh.fireCooldown = ARENA_FIRE_COOLDOWN*(arenaDiff.fireLo + Math.random()*(arenaDiff.fireHi-arenaDiff.fireLo));
   }
@@ -271,7 +278,7 @@ function updateArenaBullets(dt){
   for(let i=arenaBullets.length-1;i>=0;i--){
     const b = arenaBullets[i];
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
-    let dead = b.life<=0 || Math.abs(b.x)>ARENA_HALF+40 || Math.abs(b.y)>ARENA_HALF+40;
+    let dead = b.life<=0 || Math.abs(b.x)>arenaHalf+40 || Math.abs(b.y)>arenaHalf+40;
     if(!dead){
       const target = b.owner===player ? aiShips[0] : player;
       if(target && Math.hypot(b.x-target.x, b.y-target.y) < SHIP_RADIUS+4){

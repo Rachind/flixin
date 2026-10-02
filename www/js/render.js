@@ -219,7 +219,7 @@ function render(){
 }
 
 function drawArena(g){
-  const h = ARENA_HALF;
+  const h = arenaHalf;
   g.fillStyle = '#0a0f1a';
   g.fillRect(-h,-h,h*2,h*2);
 
@@ -249,7 +249,7 @@ function drawArena(g){
 function drawPlayerSight(g){
   const ang = player.heading;
   const dx = Math.cos(ang), dy = Math.sin(ang);
-  const h = ARENA_HALF;
+  const h = arenaHalf;
   let tMax = h*3;
   if(dx>0.0001) tMax = Math.min(tMax, (h-player.x)/dx);
   else if(dx<-0.0001) tMax = Math.min(tMax, (-h-player.x)/dx);
@@ -351,7 +351,7 @@ function renderArena(){
   }
   if(shakeTime>0) shakeTime=Math.max(0,shakeTime-1/60);
 
-  const zoom = Math.min(pw,ph) / (ARENA_HALF*2*1.15);
+  const zoom = Math.min(pw,ph) / (arenaHalf*2*1.15);
   pctx.save();
   pctx.translate(pw/2+shakeX, ph/2+shakeY);
   pctx.scale(zoom,zoom);

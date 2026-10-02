@@ -179,11 +179,8 @@ function updateMenuSummary(){
   hint.textContent = SAVE.bots===0 ? 'Соло-заезд' : SAVE.bots+' соперник'+(SAVE.bots===1?'':'а');
 
   const curDiff = SAVE.pvpDifficulty || 'normal';
-  document.querySelectorAll('#pvp-diff-stepper button').forEach(b=>{
-    b.classList.toggle('active', b.dataset.d===curDiff);
-  });
-  const diffHint=document.getElementById('pvp-diff-hint');
-  if(diffHint) diffHint.textContent = (PVP_DIFFICULTIES[curDiff]||PVP_DIFFICULTIES.normal).label;
+  document.getElementById('pvp-diff-select').value = curDiff;
+  document.getElementById('pvp-size-select').value = ARENA_SIZES[SAVE.pvpArenaSize] ? SAVE.pvpArenaSize : 'medium';
 }
 
 const splashScreen=document.getElementById('splash-screen');
@@ -209,7 +206,11 @@ function openRaceSetup(mode){
   const soloRow=document.getElementById('solo-row');
   const pvpRow=document.getElementById('pvp-row');
   const pvpDiffRow=document.getElementById('pvp-diff-row');
+  const pvpSizeRow=document.getElementById('pvp-size-row');
   const setupTitle=document.getElementById('setup-title');
+  // the arena duel has no track — its size row replaces the track picker
+  document.getElementById('open-track-btn').classList.toggle('hidden', mode==='pvp');
+  pvpSizeRow.classList.toggle('hidden', mode!=='pvp');
   botsRow.classList.add('hidden');
   soloRow.classList.add('hidden');
   pvpRow.classList.add('hidden');
@@ -407,11 +408,15 @@ document.getElementById('bots-stepper').addEventListener('click', (e)=>{
   persistSave();
   updateMenuSummary();
 });
-document.getElementById('pvp-diff-stepper').addEventListener('click', (e)=>{
-  const btn=e.target.closest('button');
-  if(!btn) return;
+document.getElementById('pvp-size-select').addEventListener('change', (e)=>{
   playSfx('ui');
-  SAVE.pvpDifficulty = btn.dataset.d;
+  SAVE.pvpArenaSize = e.target.value;
+  persistSave();
+  updateMenuSummary();
+});
+document.getElementById('pvp-diff-select').addEventListener('change', (e)=>{
+  playSfx('ui');
+  SAVE.pvpDifficulty = e.target.value;
   persistSave();
   updateMenuSummary();
 });

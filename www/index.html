@@ -108,14 +108,17 @@
         <div class="summary-label">Режим</div>
         <div class="bots-hint">Арена — квадратная площадка, оружие, бой до 5 попаданий</div>
       </div>
+      <div class="summary-row hidden" id="pvp-size-row">
+        <label class="summary-label" for="pvp-size-select">Арена</label>
+        <select class="px-select" id="pvp-size-select">
+          <option value="small">Малая</option><option value="medium">Средняя</option><option value="large">Большая</option>
+        </select>
+      </div>
       <div class="summary-row hidden" id="pvp-diff-row">
-        <div>
-          <div class="summary-label">Сложность</div>
-          <div class="bots-hint" id="pvp-diff-hint">—</div>
-        </div>
-        <div class="stepper" id="pvp-diff-stepper">
-          <button data-d="easy">Легко</button><button data-d="normal">Обычно</button><button data-d="hard">Сложно</button>
-        </div>
+        <label class="summary-label" for="pvp-diff-select">Сложность</label>
+        <select class="px-select" id="pvp-diff-select">
+          <option value="easy">Легко</option><option value="normal">Обычно</option><option value="hard">Сложно</option>
+        </select>
       </div>
     </div>
 
