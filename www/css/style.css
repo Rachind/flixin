@@ -73,7 +73,9 @@ button{font-family:inherit;}
 
 /* ---------- Menu ---------- */
 #splash-screen{background:transparent;}
-#mode-screen{background:rgba(5,6,11,0.5); position:relative;}
+#mode-screen{background:rgba(5,6,11,0.5);}
+#mode-profile-btn{left:16px; right:auto;}
+#mode-settings-btn{left:62px; right:auto;}
 #menu-screen{background:var(--bg); image-rendering:pixelated;}
 
 .play-btn{
