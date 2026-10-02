@@ -342,6 +342,12 @@ function buildTuningScreen(){
     }
     top.appendChild(name); top.appendChild(pips);
     row.appendChild(top);
+    if(stat==='durability'){
+      const dur=getEffectiveStats(skin).durability;
+      const desc=document.createElement('div'); desc.className='upgrade-desc';
+      desc.textContent='Выдерживает ударов: '+hullMaxHits(dur, HULL_HITS_RACE)+' в гонке, '+hullMaxHits(dur, HULL_HITS_ARENA)+' в арене';
+      row.appendChild(desc);
+    }
     const btn=document.createElement('button'); btn.className='upgrade-btn';
     const level=lv[stat];
     if(level>=UPGRADE_MAX_LEVEL){

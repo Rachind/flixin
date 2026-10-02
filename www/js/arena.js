@@ -8,7 +8,6 @@ const ARENA_SIZES = {
   large:  { label:'Большая', half:340 },
 };
 let arenaHalf = ARENA_SIZES.medium.half;
-const ARENA_WIN_HITS = 5;         // hits needed to win a duel
 const ARENA_BULLET_SPEED = 900;
 const ARENA_BULLET_LIFE = 1.1;
 const ARENA_FIRE_COOLDOWN = 0.38;
@@ -47,6 +46,8 @@ function makeShip(isPlayer, skin, name){
     crateCount:0, nearMissCount:0, overtakeCount:0, hadCollision:false,
     isRival:false,
     arenaScore:0, fireCooldown:0, hitFlash:0, shieldTime:0, boostTime:0,
+    hull:0, hullMax:0, lastHullHit:-99, destroyed:false,
+    damageSeed: Math.floor(Math.random()*1e6),
   };
 }
 
@@ -80,6 +81,13 @@ function resetRace(){
     aiShips.push(makeShip(false, aiSkin, AI_NAMES[i%AI_NAMES.length]));
   }
   ships = [player, ...aiShips];
+  // the player's hull depends on their (upgraded) durability; the duel rival's on its ship's base stat.
+  // Bots on a track never crash into anything, so they get no hull.
+  const hullBase = raceMode==='pvp' ? HULL_HITS_ARENA : HULL_HITS_RACE;
+  initHull(player, getEffectiveStats(skin).durability, hullBase);
+  if(raceMode==='pvp') initHull(aiShips[0], aiShips[0].skin.stats.durability, hullBase);
+  wreckTimer = 0;
+  buildHullBar();
 
   if(raceMode==='pvp'){
     // square-arena duel: start on opposite sides, facing each other
@@ -141,8 +149,10 @@ function resetRace(){
   isNewBest = false;
 }
 
-/* ---------------- Arena (PvP duel): free movement inside a square, weapons, 5 hits to win ---------------- */
+/* ---------------- Arena (PvP duel): free movement inside a square, weapons, wreck the rival's hull to win ---------------- */
 function updateArenaShip(dt){
+  emitDamageFx(player, dt);
+  if(player.destroyed) return;
   const stats = getEffectiveStats(player.skin);
   let jx=input.jx, jy=input.jy;
   if(Math.abs(jx)<0.001 && Math.abs(jy)<0.001){
@@ -200,6 +210,8 @@ function updateArenaShip(dt){
 }
 
 function updateArenaAI(sh, dt){
+  emitDamageFx(sh, dt);
+  if(sh.destroyed) return;
   const stats = sh.skin.stats;
   const dx = player.x - sh.x, dy = player.y - sh.y;
   const dist = Math.hypot(dx,dy) || 1;
@@ -241,7 +253,7 @@ function updateArenaAI(sh, dt){
   sh.x = nx; sh.y = ny;
 
   sh.fireCooldown -= dt;
-  if(sh.fireCooldown<=0 && dist < arenaHalf*2.6){
+  if(sh.fireCooldown<=0 && dist < arenaHalf*2.6 && !player.destroyed){
     fireArenaBullet(sh, angToPlayer + (Math.random()-0.5)*arenaDiff.spread);
     sh.fireCooldown = ARENA_FIRE_COOLDOWN*(arenaDiff.fireLo + Math.random()*(arenaDiff.fireHi-arenaDiff.fireLo));
   }
@@ -281,7 +293,7 @@ function updateArenaBullets(dt){
     let dead = b.life<=0 || Math.abs(b.x)>arenaHalf+40 || Math.abs(b.y)>arenaHalf+40;
     if(!dead){
       const target = b.owner===player ? aiShips[0] : player;
-      if(target && Math.hypot(b.x-target.x, b.y-target.y) < SHIP_RADIUS+4){
+      if(target && !target.destroyed && Math.hypot(b.x-target.x, b.y-target.y) < SHIP_RADIUS+4){
         dead = true;
         if(target.shieldTime>0){
           spawnParticles(b.x,b.y,9,{spread:Math.PI*2, minSpeed:50, speedRange:80, life:0.3, size:2.5, color:'#3ddbd0'});
@@ -298,18 +310,24 @@ function updateArenaBullets(dt){
 function registerArenaHit(shooter, target){
   target.hitFlash = 0.35;
   shooter.arenaScore++;
+  target.lastHullHit = -99; // every bullet counts, no grace period in the arena
+  if(damageHull(target)){
+    if(shooter.isPlayer){
+      hitMarkerEl.classList.remove('show');
+      void hitMarkerEl.offsetWidth;
+      hitMarkerEl.classList.add('show');
+    }
+    return;
+  }
   spawnParticles(target.x, target.y, 14, {spread:Math.PI*2, minSpeed:70, speedRange:110, life:0.45, size:3, color:shooter.isPlayer?'#3ddbd0':'#ff4d5e'});
   shakeTime = Math.max(shakeTime, 0.18);
   playSfx('hit');
   hapticPulse(shooter.isPlayer ? 15 : 25);
-  spawnPopup(shooter.isPlayer ? ('Попадание! '+shooter.arenaScore+'/'+ARENA_WIN_HITS) : 'Попадание соперника!');
+  spawnPopup(shooter.isPlayer ? ('Попадание! '+shooter.arenaScore+'/'+target.hullMax) : 'Попадание соперника!');
   if(shooter.isPlayer){
     hitMarkerEl.classList.remove('show');
     void hitMarkerEl.offsetWidth;
     hitMarkerEl.classList.add('show');
-  }
-  if(shooter.arenaScore >= ARENA_WIN_HITS){
-    endArenaMatch(shooter===player);
   }
 }
 
@@ -373,6 +391,8 @@ function getGhostPose(t){
 }
 
 function updatePlayer(dt){
+  emitDamageFx(player, dt);
+  if(player.destroyed) return;
   const stats = getEffectiveStats(player.skin);
   let jx=input.jx, jy=input.jy;
   if(Math.abs(jx)<0.001 && Math.abs(jy)<0.001){
@@ -427,10 +447,12 @@ function updatePlayer(dt){
     const tp = trackPointAt(proj.progress);
     nx = tp.pos.x + tp.normal.x*clampedLat;
     ny = tp.pos.y + tp.normal.y*clampedLat;
+    const impactSpeed = Math.abs(vx*tp.normal.x + vy*tp.normal.y); // speed into the wall, not along it
     const durabilityRelief = 1 - clamp((stats.durability-1)*0.5, -0.3, 0.5);
     player.speedPenalty = Math.min(player.speedPenalty, clamp(0.5*durabilityRelief,0.25,0.85));
     player.speed *= clamp(0.6*durabilityRelief,0.4,0.9);
     player.hadCollision = true;
+    if(impactSpeed >= WALL_IMPACT_MIN_SPEED && damageHull(player)) return;
     if(raceTime - player.lastWallSpark > 0.15){
       player.lastWallSpark = raceTime;
       spawnParticles(nx,ny,7,{spread:Math.PI*2, minSpeed:60, speedRange:90, life:0.4, size:3, color:'#ffe08a'});
@@ -471,6 +493,7 @@ function updatePlayer(dt){
         shakeTime = Math.max(shakeTime, 0.25);
         playSfx('crash');
         hapticPulse(35);
+        if(damageHull(player)) return;
       }
     } else if(dist < hitDist+NEAR_MISS_MARGIN && player.speed>MAX_SPEED*0.55 && raceTime-o.lastNearMiss>1.0){
       o.lastNearMiss = raceTime;
@@ -530,6 +553,8 @@ function endRace(){
   hudEl.classList.add('hidden');
   joyZoneEl.classList.add('hidden');
   stopEngineSound();
+  if(player.destroyed){ endWreckedRace(); return; }
+  finishTitleEl.textContent = 'Финиш';
   const place = finishOrder.indexOf(player)+1;
   const total = ships.length;
   let placementBonus;
@@ -603,6 +628,42 @@ function endRace(){
   finishScreen.classList.remove('hidden');
 }
 
+/* The player's hull gave out before the finish line: no place, no record, only a small consolation payout */
+function endWreckedRace(){
+  const earned = 10 + Math.round(player.trickScore*0.25);
+  SAVE.credits += earned;
+  const st = SAVE.stats;
+  st.totalRaces++;
+  st.totalDistance += Math.round(player.progress);
+  st.totalCreditsEarned += earned;
+  st.totalObstaclesDestroyed += player.crateCount;
+  st.totalOvertakes += player.overtakeCount;
+  st.totalNearMisses += player.nearMissCount;
+  st.raceCountByShip[player.skin.id] = (st.raceCountByShip[player.skin.id]||0)+1;
+  const newAchievements = checkAchievements({flawless:false});
+  persistSave();
+
+  finishTitleEl.textContent = 'Корабль разрушен';
+  document.getElementById('finish-place').textContent = 'Сход';
+  document.getElementById('finish-time').textContent = fmtTime(raceTime);
+  document.getElementById('finish-score').textContent = player.trickScore;
+  document.getElementById('finish-earned').textContent = '+'+earned+' ₡';
+  document.getElementById('finish-best-row').classList.add('hidden');
+  document.getElementById('retry-btn').textContent = 'Ещё раз';
+
+  const unlockBox = document.getElementById('finish-unlocks');
+  unlockBox.innerHTML='';
+  unlockBox.classList.toggle('hidden', !newAchievements.length);
+  newAchievements.forEach(a=>{
+    const row=document.createElement('div');
+    row.className='unlock-line';
+    row.textContent='Ачивка: '+a.name+' (+'+a.reward+' ₡)';
+    unlockBox.appendChild(row);
+  });
+  playSfx('finish');
+  finishScreen.classList.remove('hidden');
+}
+
 function endArenaMatch(playerWon){
   STATE='finished';
   hudEl.classList.add('hidden');
@@ -615,6 +676,7 @@ function endArenaMatch(playerWon){
   SAVE.credits += earned;
 
   const rivalScore = aiShips[0].arenaScore;
+  finishTitleEl.textContent = 'Финиш';
   const cleanWin = playerWon && rivalScore===0;
 
   const st = SAVE.stats;

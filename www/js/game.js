@@ -55,6 +55,99 @@ const NEAR_MISS_MARGIN = 20;
 const AI_NAMES = ['Рейвен','Тайфун'];
 const PVP_RIVAL_NAME = 'Соперник';
 
+/* ---------------- Hull integrity (how many hits a ship survives, driven by its durability stat) ---------------- */
+const HULL_HITS_RACE = 8;          // hits a durability-1.0 ship survives on a track
+const HULL_HITS_ARENA = 5;         // hits a durability-1.0 ship survives in an arena duel
+const HULL_HIT_COOLDOWN = 0.6;     // grace period after a hit, so one crash isn't counted several frames in a row
+const WALL_IMPACT_MIN_SPEED = 140; // speed into the wall (across the track) that counts as a hit; gentle scrapes don't
+const WRECK_DELAY = 1.4;           // explosion plays this long before the result screen
+let wreckTimer = 0;
+
+function hullMaxHits(durability, base){
+  return Math.max(2, Math.round(base*durability));
+}
+function initHull(sh, durability, base){
+  sh.hullMax = hullMaxHits(durability, base);
+  sh.hull = sh.hullMax;
+  sh.lastHullHit = -99;
+  sh.destroyed = false;
+}
+function hullDamage(sh){
+  return sh.hullMax ? 1 - sh.hull/sh.hullMax : 0;
+}
+/* Takes one hit off the hull (unless still in the post-hit grace period). Returns true if the ship got destroyed. */
+function damageHull(sh){
+  if(sh.destroyed || !sh.hullMax) return false;
+  if(raceTime - sh.lastHullHit < HULL_HIT_COOLDOWN) return false;
+  sh.lastHullHit = raceTime;
+  sh.hull = Math.max(0, sh.hull-1);
+  const colors = sh.isPlayer ? getRenderColors(sh.skin, sh.skin.id) : sh.skin.colors;
+  spawnParticles(sh.x, sh.y, 6, {spread:Math.PI*2, minSpeed:40, speedRange:90, life:0.6, size:2.5, color:colors.B});
+  if(sh.isPlayer) updateHullBar();
+  if(sh.hull<=0){
+    wreckShip(sh);
+    return true;
+  }
+  if(sh.isPlayer && sh.hull===1) spawnPopup('Корпус на пределе!');
+  return false;
+}
+function wreckShip(sh){
+  sh.destroyed = true;
+  sh.speed = 0;
+  spawnParticles(sh.x, sh.y, 30, {spread:Math.PI*2, minSpeed:60, speedRange:200, life:0.9, size:4.5, color:'#ff8c42'});
+  spawnParticles(sh.x, sh.y, 18, {spread:Math.PI*2, minSpeed:30, speedRange:120, life:1.1, size:4, color:'#ffe08a'});
+  spawnParticles(sh.x, sh.y, 14, {spread:Math.PI*2, minSpeed:20, speedRange:80, life:1.3, size:5, color:'#5a5f69'});
+  shakeTime = Math.max(shakeTime, 0.4);
+  playSfx('explode');
+  hapticPulse([40,30,80]);
+  if(sh.isPlayer){ stopEngineSound(); spawnPopup('Корабль разрушен!'); }
+  wreckTimer = WRECK_DELAY;
+}
+/* Smoke / sparks trailing a damaged ship, plus the burning wreck while the explosion plays */
+function emitDamageFx(sh, dt){
+  if(sh.destroyed){
+    if(Math.random()<dt*25){
+      spawnParticles(sh.x+(Math.random()-0.5)*16, sh.y+(Math.random()-0.5)*16, 1,
+        {spread:Math.PI*2, minSpeed:10, speedRange:40, life:0.7, size:4, color: Math.random()<0.5?'#ff8c42':'#5a5f69'});
+    }
+    return;
+  }
+  const dmg = hullDamage(sh);
+  if(dmg>=0.35 && Math.random()<dt*(6+dmg*18)){
+    spawnParticles(sh.x - Math.cos(sh.heading)*6, sh.y - Math.sin(sh.heading)*6, 1,
+      {dirAngle:sh.heading+Math.PI, spread:0.9, minSpeed:15, speedRange:30, life:0.8, size:3.5, color: dmg>=0.7?'#3a3d44':'#7a808b'});
+  }
+  if(dmg>=0.6 && Math.random()<dt*(dmg*10)){
+    spawnParticles(sh.x+(Math.random()-0.5)*14, sh.y+(Math.random()-0.5)*14, 2,
+      {spread:Math.PI*2, minSpeed:40, speedRange:70, life:0.25, size:2, color: Math.random()<0.5?'#ffe08a':'#ff8c42'});
+  }
+}
+/* Ends the race / duel once the wreck's explosion has played out */
+function updateWreck(dt){
+  if(wreckTimer<=0) return;
+  wreckTimer -= dt;
+  if(wreckTimer<=0){
+    if(raceMode==='pvp') endArenaMatch(!player.destroyed);
+    else endRace();
+  }
+}
+
+const hullCellsEl = document.getElementById('hull-cells');
+function buildHullBar(){
+  hullCellsEl.innerHTML='';
+  for(let i=0;i<player.hullMax;i++){
+    const c=document.createElement('div'); c.className='hull-cell';
+    hullCellsEl.appendChild(c);
+  }
+  updateHullBar();
+}
+function updateHullBar(){
+  const cells = hullCellsEl.children;
+  const frac = player.hull/player.hullMax;
+  hullCellsEl.className = frac<=0.34 ? 'crit' : frac<=0.67 ? 'warn' : '';
+  for(let i=0;i<cells.length;i++) cells[i].classList.toggle('lost', i>=player.hull);
+}
+
 /* ---------------- Game state machine ---------------- */
 let STATE = 'menu'; // menu | countdown | racing | finished
 let countdownTimer = 0;
@@ -65,6 +158,7 @@ const countdownText=document.getElementById('countdown-text');
 const hudEl=document.getElementById('hud');
 const joyZoneEl=document.getElementById('joystick-zone');
 const finishScreen=document.getElementById('finish-screen');
+const finishTitleEl=document.getElementById('finish-title');
 const statusTag=document.getElementById('status-tag');
 const hitMarkerEl=document.getElementById('hit-marker');
 

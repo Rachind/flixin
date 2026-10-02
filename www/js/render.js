@@ -38,9 +38,9 @@ function updateHud(ranking){
 
 function updateArenaHud(){
   const rival = aiShips[0];
-  hudPlace.textContent = String(player.arenaScore);
+  hudPlace.textContent = player.arenaScore+'/'+rival.hullMax;
   hudTime.textContent = fmtTime(raceTime);
-  hudScore.textContent = String(rival.arenaScore);
+  hudScore.textContent = rival.arenaScore+'/'+player.hullMax;
   if(player.shieldTime>0){ statusTag.textContent='Щит!'; statusTag.className='boost'; }
   else if(player.boostTime>0){ statusTag.textContent='Ускорение!'; statusTag.className='boost'; }
   else { statusTag.className=''; }

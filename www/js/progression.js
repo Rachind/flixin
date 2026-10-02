@@ -13,7 +13,7 @@ const ACHIEVEMENTS = [
   {id:'racer_10',    name:'Гонщик', desc:'Финишируй в 10 гонках', reward:50, check:s=>s.totalRaces>=10},
   {id:'champion',    name:'Чемпион', desc:'Займи 1-е место 5 раз', reward:70, check:s=>s.wins>=5},
   {id:'duelist',     name:'Дуэлянт', desc:'Победи в ПВП-арене', reward:50, check:s=>(s.arenaWins||0)>=1},
-  {id:'flawless_duel', name:'Безупречная дуэль', desc:'Победи в ПВП-арене со счётом 5:0', reward:60, check:(s,extra)=>!!(extra&&extra.cleanArenaWin)},
+  {id:'flawless_duel', name:'Безупречная дуэль', desc:'Победи в ПВП-арене, не пропустив ни одного попадания', reward:60, check:(s,extra)=>!!(extra&&extra.cleanArenaWin)},
   {id:'win_streak_3', name:'Серия побед', desc:'3 победы в ПВП-арене подряд', reward:70, check:s=>(s.arenaWinStreak||0)>=3},
 ];
 function checkAchievements(extra){
@@ -126,7 +126,62 @@ function drawTunedShip(g, skin, cell, app){
   }
   if(hasAnyAppearance(app)) drawAppearanceDecals(g, skin, cell, app);
 }
+/* ---------------- Hull damage overlay ---------------- */
+// Hull cells of the sprite in a fixed per-ship random order: each hit marks the next few of them as
+// scorched / holed / burning, so the damage builds up in place instead of jumping around.
+const DAMAGE_COVERAGE = 0.6; // share of hull cells marked when the hull is about to give out
+function getDamageCells(ship){
+  const shape = ship.skin.shape;
+  if(ship.damageCells && ship.damageCellsShape===shape) return ship.damageCells;
+  const cells = [];
+  for(let r=0;r<shape.length;r++){
+    for(let c=0;c<shape[r].length;c++){
+      const ch = shape[r][c];
+      if(ch==='B' || ch==='T' || ch==='D') cells.push([r,c]);
+    }
+  }
+  let seed = ship.damageSeed || 1;
+  const rnd = ()=>{ seed = (seed*1103515245 + 12345) % 2147483648; return seed/2147483648; };
+  for(let i=cells.length-1;i>0;i--){
+    const j = Math.floor(rnd()*(i+1));
+    [cells[i],cells[j]] = [cells[j],cells[i]];
+  }
+  ship.damageCells = cells;
+  ship.damageCellsShape = shape;
+  return cells;
+}
+function drawHullDamage(g, ship, cell){
+  const dmg = hullDamage(ship);
+  if(dmg<=0) return;
+  const shape = ship.skin.shape;
+  const H = shape.length, W = shape[0].length;
+  const ox = -(W*cell)/2, oy = -(H*cell)/2;
+  const cells = getDamageCells(ship);
+  const n = Math.min(cells.length, Math.round(cells.length*DAMAGE_COVERAGE*dmg));
+  const t = performance.now()/1000;
+  const critical = ship.hull===1;
+  for(let i=0;i<n;i++){
+    const [r,c] = cells[i];
+    const kind = i%3;
+    if(kind===0){
+      g.fillStyle = '#05070a'; // hole
+    } else if(kind===1 || dmg<0.5){
+      g.fillStyle = 'rgba(28,18,12,0.6)'; // scorch mark
+    } else {
+      const flick = 0.5 + 0.5*Math.sin(t*(critical?22:9) + i*1.7);
+      g.fillStyle = flick>0.5 ? '#ff8c42' : '#c23b12'; // smouldering ember
+    }
+    g.fillRect(ox+c*cell-0.4, oy+r*cell-0.4, cell+0.8, cell+0.8);
+  }
+  if(critical && Math.sin(t*14)>0){
+    g.globalAlpha = 0.25;
+    drawPixelGrid(g, shape, {K:'#ff4d5e', B:'#ff4d5e', D:'#ff4d5e', T:'#ff4d5e'}, cell, ox, oy);
+    g.globalAlpha = 1;
+  }
+}
+
 function drawShip(g, ship){
+  if(ship.destroyed) return;
   g.save();
   g.translate(ship.x, ship.y);
   g.rotate(ship.heading);
@@ -134,5 +189,6 @@ function drawShip(g, ship){
   const app = ship.isPlayer ? getAppearance(skin.id) : {...APPEARANCE_DEFAULT};
   const renderSkin = ship.isPlayer ? {...skin, colors:getRenderColors(skin, skin.id)} : skin;
   drawTunedShip(g, renderSkin, 4.2*skin.scale, app);
+  drawHullDamage(g, ship, 4.2*skin.scale);
   g.restore();
 }

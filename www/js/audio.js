@@ -58,6 +58,7 @@ function playSfx(type){
     case 'boost': playTone(300,0.35,'sawtooth',0.09,900); break;
     case 'wallhit': playNoiseBurst(0.12, 900, 0.16); break;
     case 'crash': playNoiseBurst(0.22, 260, 0.24); playTone(90,0.22,'triangle',0.14,50); break;
+    case 'explode': playNoiseBurst(0.7, 180, 0.32); playTone(120,0.6,'sawtooth',0.12,30); setTimeout(()=>playNoiseBurst(0.4, 600, 0.14),90); break;
     case 'crateBreak': playNoiseBurst(0.16, 2200, 0.14); playTone(1200,0.1,'square',0.05,1800); break;
     case 'trick': playTone(880,0.09,'square',0.06,1320); setTimeout(()=>playTone(1320,0.12,'square',0.045),70); break;
     case 'countdown': playTone(520,0.12,'square',0.07); break;

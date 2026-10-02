@@ -40,6 +40,7 @@ function frame(now){
       updateArenaBullets(dt);
       updateArenaPowerup(dt);
       updateParticles(dt);
+      updateWreck(dt);
       if(STATE==='racing'){
         updateArenaHud();
         renderArena();
@@ -50,6 +51,7 @@ function frame(now){
       updateParticles(dt);
       const ranking = checkOvertakes();
       checkFinish();
+      updateWreck(dt);
       if(STATE==='racing'){
         updateHud(ranking);
         render();
