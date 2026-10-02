@@ -1,5 +1,9 @@
 apply plugin: 'com.android.application'
 
+// CI passes the build number and signing key via env vars (see .github/workflows/build-apk.yml).
+def buildNumber = (System.getenv('FLIXIN_BUILD') ?: '1').toInteger()
+def keystorePath = System.getenv('FLIXIN_KEYSTORE')
+
 android {
     namespace = "com.tima.flixin"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +11,8 @@ android {
         applicationId "com.tima.flixin"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode buildNumber
+        versionName "1.0." + buildNumber
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +20,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (keystorePath) {
+            flixin {
+                storeFile file(keystorePath)
+                storePassword System.getenv('FLIXIN_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('FLIXIN_KEY_ALIAS')
+                keyPassword System.getenv('FLIXIN_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            // Without the CI key, fall back to the local debug key so release builds still install.
+            signingConfig keystorePath ? signingConfigs.flixin : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

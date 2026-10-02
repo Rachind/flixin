@@ -5,3 +5,8 @@ android/.gradle/
 android/local.properties
 android/capacitor-cordova-android-plugins/build/
 .DS_Store
+
+# Signing key — never commit
+*.jks
+*.jks.b64
+*.keystore
