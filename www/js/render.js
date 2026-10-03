@@ -32,15 +32,17 @@ function updateHud(ranking){
     if(aiMarkerEls[i]) aiMarkerEls[i].style.left = (clamp(sh.progress/TOTAL_LENGTH,0,1)*100)+'%';
   });
   if(player.slipActive){ statusTag.textContent='Слипстрим!'; statusTag.className='boost'; }
+  else if(player.dashTime>0){ statusTag.textContent='Рывок!'; statusTag.className='boost'; }
   else if(turbulenceAt(player.progress)){ statusTag.textContent='Турбулентность'; statusTag.className='turb'; }
   else { statusTag.className=''; }
 }
 
 function updateArenaHud(){
   const rival = aiShips[0];
-  hudPlace.textContent = player.arenaScore+'/'+rival.hullMax;
+  // damage dealt so far, from the hull state (perks can absorb hits or repair the hull)
+  hudPlace.textContent = (rival.hullMax-rival.hull)+'/'+rival.hullMax;
   hudTime.textContent = fmtTime(raceTime);
-  hudScore.textContent = rival.arenaScore+'/'+player.hullMax;
+  hudScore.textContent = (player.hullMax-player.hull)+'/'+player.hullMax;
   if(player.shieldTime>0){ statusTag.textContent='Щит!'; statusTag.className='boost'; }
   else if(player.boostTime>0){ statusTag.textContent='Ускорение!'; statusTag.className='boost'; }
   else { statusTag.className=''; }

@@ -52,6 +52,10 @@ const BOOST_SPEED = 610;
 const ACCEL_RATE = 1.55;
 const TURN_RATE = 4.6;
 const NEAR_MISS_MARGIN = 20;
+// collision radius against pylons and bullets — the tiny Искра is harder to hit
+function shipHitRadius(sh){ return hasPerk(sh,'tiny') ? SHIP_RADIUS*0.65 : SHIP_RADIUS; }
+// credits for a race / duel, with the Аврора sponsorship bonus
+function perkCredits(n){ return hasPerk(player,'tycoon') ? Math.round(n*1.4) : n; }
 const AI_NAMES = ['Рейвен','Тайфун'];
 const PVP_RIVAL_NAME = 'Соперник';
 
@@ -61,6 +65,7 @@ const HULL_HITS_ARENA = 5;         // hits a durability-1.0 ship survives in an 
 const HULL_HIT_COOLDOWN = 0.6;     // grace period after a hit, so one crash isn't counted several frames in a row
 const WALL_IMPACT_MIN_SPEED = 140; // speed into the wall (across the track) that counts as a hit; gentle scrapes don't
 const WRECK_DELAY = 1.4;           // explosion plays this long before the result screen
+const REGEN_INTERVAL = 10;         // 'regen' perk: seconds without hits to repair one hull cell
 let wreckTimer = 0;
 
 function hullMaxHits(durability, base){
@@ -80,11 +85,33 @@ function damageHull(sh){
   if(sh.destroyed || !sh.hullMax) return false;
   if(raceTime - sh.lastHullHit < HULL_HIT_COOLDOWN) return false;
   sh.lastHullHit = raceTime;
+  sh.regenTimer = 0;
+  sh.hitAbsorbed = false;
+  if(hasPerk(sh,'insurance') && !sh.insuranceUsed){
+    sh.insuranceUsed = true;
+    sh.hitAbsorbed = true;
+    spawnParticles(sh.x, sh.y, 10, {spread:Math.PI*2, minSpeed:50, speedRange:80, life:0.4, size:2.5, color:'#3ddbd0'});
+    playSfx('shieldBlock');
+    spawnPopup('Страховка: удар поглощён');
+    return false;
+  }
   sh.hull = Math.max(0, sh.hull-1);
   const colors = sh.isPlayer ? getRenderColors(sh.skin, sh.skin.id) : sh.skin.colors;
   spawnParticles(sh.x, sh.y, 6, {spread:Math.PI*2, minSpeed:40, speedRange:90, life:0.6, size:2.5, color:colors.B});
   if(sh.isPlayer) updateHullBar();
   if(sh.hull<=0){
+    if(hasPerk(sh,'rebirth') && !sh.rebirthUsed){
+      sh.rebirthUsed = true;
+      sh.hull = Math.min(2, sh.hullMax);
+      spawnParticles(sh.x, sh.y, 26, {spread:Math.PI*2, minSpeed:60, speedRange:160, life:0.8, size:4, color:'#ff8c42'});
+      spawnParticles(sh.x, sh.y, 14, {spread:Math.PI*2, minSpeed:30, speedRange:90, life:0.9, size:3, color:'#ffd54f'});
+      shakeTime = Math.max(shakeTime, 0.3);
+      playSfx('boost');
+      hapticPulse([30,30,50]);
+      spawnPopup('Возрождение!');
+      updateHullBar();
+      return false;
+    }
     wreckShip(sh);
     return true;
   }
@@ -121,6 +148,17 @@ function emitDamageFx(sh, dt){
     spawnParticles(sh.x+(Math.random()-0.5)*14, sh.y+(Math.random()-0.5)*14, 2,
       {spread:Math.PI*2, minSpeed:40, speedRange:70, life:0.25, size:2, color: Math.random()<0.5?'#ffe08a':'#ff8c42'});
   }
+}
+/* 'regen' perk: slowly patches the hull while the ship avoids hits */
+function updateRegen(sh, dt){
+  if(!hasPerk(sh,'regen') || sh.destroyed || sh.hull>=sh.hullMax){ sh.regenTimer = 0; return; }
+  sh.regenTimer += dt;
+  if(sh.regenTimer < REGEN_INTERVAL) return;
+  sh.regenTimer = 0;
+  sh.hull++;
+  spawnParticles(sh.x, sh.y, 10, {spread:Math.PI*2, minSpeed:30, speedRange:60, life:0.5, size:2.5, color:'#48cae4'});
+  spawnPopup('Саморемонт +1');
+  updateHullBar();
 }
 /* Ends the race / duel once the wreck's explosion has played out */
 function updateWreck(dt){
@@ -206,6 +244,7 @@ function startCountdown(){
   countdownTimer=1.0;
   countdownEl.classList.remove('hidden');
   countdownText.textContent='3';
+  countdownText.classList.remove('long');
   countdownText.style.animation='none';
   void countdownText.offsetWidth;
   countdownText.style.animation='';

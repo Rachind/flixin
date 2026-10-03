@@ -23,6 +23,7 @@ function frame(now){
         playSfx('countdown');
       } else if(countdownPhase===0){
         countdownText.textContent='СТАРТ!';
+        countdownText.classList.add('long');
         countdownTimer=0.7;
         playSfx('go');
       } else {

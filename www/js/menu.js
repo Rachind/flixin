@@ -69,10 +69,13 @@ function buildShipGrid(){
       statsRow.appendChild(bar);
     });
     card.appendChild(statsRow);
-    if(owned){
-      const ds=document.createElement('div'); ds.className='sdesc'; ds.textContent=skin.desc;
-      card.appendChild(ds);
-    } else {
+    const perk=PERKS[skin.perk];
+    const pk=document.createElement('div'); pk.className='sperk'; pk.textContent=perk.name;
+    pk.title=perk.desc;
+    card.appendChild(pk);
+    const ds=document.createElement('div'); ds.className='sdesc'; ds.textContent=perk.desc;
+    card.appendChild(ds);
+    if(!owned){
       const price=document.createElement('div'); price.className='sprice'; price.textContent='₡ '+skin.price;
       card.appendChild(price);
       const lock=document.createElement('div'); lock.className='lock-badge';
@@ -296,6 +299,8 @@ document.getElementById('tuning-back').addEventListener('click', ()=>{
 function buildTuningScreen(){
   const skin = SKINS[selectedSkinIdx];
   document.getElementById('tuning-ship-name').textContent = skin.name;
+  const perk=PERKS[skin.perk];
+  document.getElementById('tuning-ship-perk').textContent = perk.name+': '+perk.desc;
   const cv=document.getElementById('tuning-ship-canvas');
   const g=cv.getContext('2d'); g.imageSmoothingEnabled=false;
   g.clearRect(0,0,cv.width,cv.height);

@@ -47,6 +47,7 @@ function makeShip(isPlayer, skin, name){
     isRival:false,
     arenaScore:0, fireCooldown:0, hitFlash:0, shieldTime:0, boostTime:0,
     hull:0, hullMax:0, lastHullHit:-99, destroyed:false,
+    insuranceUsed:false, rebirthUsed:false, hitAbsorbed:false, regenTimer:0, dashTime:0,
     damageSeed: Math.floor(Math.random()*1e6),
   };
 }
@@ -153,6 +154,7 @@ function resetRace(){
 function updateArenaShip(dt){
   emitDamageFx(player, dt);
   if(player.destroyed) return;
+  updateRegen(player, dt);
   const stats = getEffectiveStats(player.skin);
   let jx=input.jx, jy=input.jy;
   if(Math.abs(jx)<0.001 && Math.abs(jy)<0.001){
@@ -177,7 +179,7 @@ function updateArenaShip(dt){
   if(nx<-lim||nx>lim){ nx=clamp(nx,-lim,lim); hitWall=true; }
   if(ny<-lim||ny>lim){ ny=clamp(ny,-lim,lim); hitWall=true; }
   if(hitWall){
-    player.speed *= 0.55;
+    player.speed *= hasPerk(player,'armor') ? 0.9 : 0.55;
     if(raceTime - player.lastWallSpark > 0.15){
       player.lastWallSpark = raceTime;
       spawnParticles(nx,ny,7,{spread:Math.PI*2, minSpeed:60, speedRange:90, life:0.4, size:3, color:'#ffe08a'});
@@ -191,7 +193,7 @@ function updateArenaShip(dt){
   player.fireCooldown -= dt;
   if(input.fireHeld && player.fireCooldown<=0){
     fireArenaBullet(player, player.heading);
-    player.fireCooldown = ARENA_FIRE_COOLDOWN;
+    player.fireCooldown = ARENA_FIRE_COOLDOWN * (hasPerk(player,'overload') ? 0.6 : 1);
   }
   if(player.hitFlash>0) player.hitFlash = Math.max(0, player.hitFlash-dt);
 
@@ -254,7 +256,8 @@ function updateArenaAI(sh, dt){
 
   sh.fireCooldown -= dt;
   if(sh.fireCooldown<=0 && dist < arenaHalf*2.6 && !player.destroyed){
-    fireArenaBullet(sh, angToPlayer + (Math.random()-0.5)*arenaDiff.spread);
+    const spread = arenaDiff.spread + (hasPerk(player,'stealth') ? 0.35 : 0);
+    fireArenaBullet(sh, angToPlayer + (Math.random()-0.5)*spread);
     sh.fireCooldown = ARENA_FIRE_COOLDOWN*(arenaDiff.fireLo + Math.random()*(arenaDiff.fireHi-arenaDiff.fireLo));
   }
   if(sh.hitFlash>0) sh.hitFlash = Math.max(0, sh.hitFlash-dt);
@@ -293,7 +296,7 @@ function updateArenaBullets(dt){
     let dead = b.life<=0 || Math.abs(b.x)>arenaHalf+40 || Math.abs(b.y)>arenaHalf+40;
     if(!dead){
       const target = b.owner===player ? aiShips[0] : player;
-      if(target && !target.destroyed && Math.hypot(b.x-target.x, b.y-target.y) < SHIP_RADIUS+4){
+      if(target && !target.destroyed && Math.hypot(b.x-target.x, b.y-target.y) < shipHitRadius(target)+4){
         dead = true;
         if(target.shieldTime>0){
           spawnParticles(b.x,b.y,9,{spread:Math.PI*2, minSpeed:50, speedRange:80, life:0.3, size:2.5, color:'#3ddbd0'});
@@ -308,10 +311,12 @@ function updateArenaBullets(dt){
 }
 
 function registerArenaHit(shooter, target){
+  target.lastHullHit = -99; // every bullet counts, no grace period in the arena
+  const wrecked = damageHull(target);
+  if(target.hitAbsorbed) return; // soaked up by a perk: no hit, no score
   target.hitFlash = 0.35;
   shooter.arenaScore++;
-  target.lastHullHit = -99; // every bullet counts, no grace period in the arena
-  if(damageHull(target)){
+  if(wrecked){
     if(shooter.isPlayer){
       hitMarkerEl.classList.remove('show');
       void hitMarkerEl.offsetWidth;
@@ -323,7 +328,7 @@ function registerArenaHit(shooter, target){
   shakeTime = Math.max(shakeTime, 0.18);
   playSfx('hit');
   hapticPulse(shooter.isPlayer ? 15 : 25);
-  spawnPopup(shooter.isPlayer ? ('Попадание! '+shooter.arenaScore+'/'+target.hullMax) : 'Попадание соперника!');
+  spawnPopup(shooter.isPlayer ? ('Попадание! '+(target.hullMax-target.hull)+'/'+target.hullMax) : 'Попадание соперника!');
   if(shooter.isPlayer){
     hitMarkerEl.classList.remove('show');
     void hitMarkerEl.offsetWidth;
@@ -339,9 +344,10 @@ function updateArenaPowerup(dt){
     }
   } else {
     for(const sh of ships){
-      if(Math.hypot(sh.x, sh.y) < ARENA_POWERUP_RADIUS+SHIP_RADIUS){
+      const reach = (ARENA_POWERUP_RADIUS+SHIP_RADIUS) * (hasPerk(sh,'magnet') ? 3 : 1);
+      if(Math.hypot(sh.x, sh.y) < reach){
         if(arenaPowerup.type==='shield') sh.shieldTime = ARENA_SHIELD_DURATION;
-        else sh.boostTime = ARENA_BOOST_DURATION;
+        else sh.boostTime = ARENA_BOOST_DURATION * (hasPerk(sh,'afterburner') ? 2 : 1);
         spawnParticles(0,0,16,{spread:Math.PI*2, minSpeed:60, speedRange:110, life:0.5, size:3.5, color: arenaPowerup.type==='shield' ? '#3ddbd0' : '#ffd166'});
         playSfx(arenaPowerup.type==='shield' ? 'shieldUp' : 'boost');
         if(sh.isPlayer) spawnPopup(arenaPowerup.type==='shield' ? 'Щит!' : 'Ускорение!');
@@ -393,6 +399,7 @@ function getGhostPose(t){
 function updatePlayer(dt){
   emitDamageFx(player, dt);
   if(player.destroyed) return;
+  updateRegen(player, dt);
   const stats = getEffectiveStats(player.skin);
   let jx=input.jx, jy=input.jy;
   if(Math.abs(jx)<0.001 && Math.abs(jy)<0.001){
@@ -404,15 +411,18 @@ function updatePlayer(dt){
   const inTurb = turbulenceAt(prevProj.progress);
 
   let bestGap = Infinity;
+  const stealth = hasPerk(player,'stealth');
+  const slipRange = stealth ? 260 : 150, slipLane = stealth ? Infinity : 75;
   for(const other of aiShips){
     const diff = other.progress - player.progress;
     const latDiff = Math.abs(other.lateral - player.lateral);
-    if(diff>0 && diff<150 && latDiff<75) bestGap=Math.min(bestGap,diff);
+    if(diff>0 && diff<slipRange && latDiff<slipLane) bestGap=Math.min(bestGap,diff);
   }
   const wasSlipActive = player.slipActive;
   if(bestGap<Infinity){ player.slipTimer = Math.min(player.slipTimer+dt, 2); }
   else { player.slipTimer = Math.max(player.slipTimer-dt*1.6, 0); }
-  player.slipActive = player.slipTimer>0.55;
+  const afterburner = hasPerk(player,'afterburner');
+  player.slipActive = player.slipTimer > (afterburner ? 0.25 : 0.55);
   if(player.slipActive && !wasSlipActive){ playSfx('boost'); }
 
   if(mag>0.12){
@@ -420,16 +430,19 @@ function updatePlayer(dt){
     player.heading = angleLerp(player.heading, desired, clamp(TURN_RATE*stats.handling*mag*dt,0,1));
   }
 
-  player.speedPenalty = Math.min(1, player.speedPenalty + dt*0.9);
+  player.speedPenalty = Math.min(1, player.speedPenalty + dt*(hasPerk(player,'overload') ? 2.4 : 0.9));
+  if(player.dashTime>0) player.dashTime = Math.max(0, player.dashTime-dt);
 
-  const targetSpeed = (player.slipActive?BOOST_SPEED:MAX_SPEED) * stats.speed * player.speedPenalty;
+  const slipSpeed = afterburner ? BOOST_SPEED*1.1 : BOOST_SPEED;
+  const dashMul = player.dashTime>0 ? 1.2 : 1;
+  const targetSpeed = (player.slipActive?slipSpeed:MAX_SPEED) * stats.speed * player.speedPenalty * dashMul;
   player.speed = lerp(player.speed, targetSpeed, clamp(ACCEL_RATE*stats.accel*dt,0,1));
   updateEngineSound(player.speed, MAX_SPEED*stats.speed);
 
   let vx=Math.cos(player.heading)*player.speed;
   let vy=Math.sin(player.heading)*player.speed;
 
-  if(inTurb){
+  if(inTurb && !hasPerk(player,'icetail')){
     const n = TRACK.normals[prevProj.segIndex];
     const force = Math.sin(raceTime*8 + 3.1) * 260 + (Math.random()-0.5)*180;
     vx += n.x*force*dt*6;
@@ -456,10 +469,11 @@ function updatePlayer(dt){
     ny = tp.pos.y + tp.normal.y*clampedLat;
     const impactSpeed = Math.abs(vx*tp.normal.x + vy*tp.normal.y); // speed into the wall, not along it
     const durabilityRelief = 1 - clamp((stats.durability-1)*0.5, -0.3, 0.5);
-    player.speedPenalty = Math.min(player.speedPenalty, clamp(0.5*durabilityRelief,0.25,0.85));
-    player.speed *= clamp(0.6*durabilityRelief,0.4,0.9);
+    const armor = hasPerk(player,'armor');
+    player.speedPenalty = Math.min(player.speedPenalty, armor ? 0.85 : clamp(0.5*durabilityRelief,0.25,0.85));
+    player.speed *= armor ? 0.9 : clamp(0.6*durabilityRelief,0.4,0.9);
     player.hadCollision = true;
-    if(impactSpeed >= WALL_IMPACT_MIN_SPEED && damageHull(player)) return;
+    if(!armor && impactSpeed >= WALL_IMPACT_MIN_SPEED && damageHull(player)) return;
     if(raceTime - player.lastWallSpark > 0.15){
       player.lastWallSpark = raceTime;
       spawnParticles(nx,ny,7,{spread:Math.PI*2, minSpeed:60, speedRange:90, life:0.4, size:3, color:'#ffe08a'});
@@ -478,16 +492,28 @@ function updatePlayer(dt){
   for(const o of obstacles){
     if(!o.alive) continue;
     const dist = Math.hypot(player.x-o.x, player.y-o.y);
-    const hitDist = o.r+SHIP_RADIUS*0.7;
+    const hitDist = o.r + shipHitRadius(player)*0.7 + (o.destructible && hasPerk(player,'magnet') ? 55 : 0);
     if(dist < hitDist){
       if(o.destructible){
         o.alive=false;
         spawnParticles(o.x,o.y,16,{spread:Math.PI*2, minSpeed:60, speedRange:120, life:0.55, size:4, color:'#3ddbd0'});
         addTrick('Обломки!', 20);
         player.crateCount++;
-        player.speed *= 0.9;
+        if(!hasPerk(player,'slicer')) player.speed *= 0.9;
         playSfx('crateBreak');
         hapticPulse(10);
+      } else if(hasPerk(player,'ram')){
+        // the ram smashes the pylon and ploughs on, but the hull still takes the hit
+        o.alive=false;
+        player.speedPenalty = Math.min(player.speedPenalty, 0.8);
+        player.speed *= 0.85;
+        player.hadCollision = true;
+        spawnParticles(o.x,o.y,18,{spread:Math.PI*2, minSpeed:70, speedRange:140, life:0.55, size:4, color:'#ff9a4d'});
+        shakeTime = Math.max(shakeTime, 0.3);
+        playSfx('crash');
+        hapticPulse(35);
+        spawnPopup('Таран!');
+        if(damageHull(player)) return;
       } else {
         const nx2=(player.x-o.x)/(dist||1), ny2=(player.y-o.y)/(dist||1);
         player.x = o.x + nx2*hitDist;
@@ -504,7 +530,8 @@ function updatePlayer(dt){
       }
     } else if(dist < hitDist+NEAR_MISS_MARGIN && player.speed>MAX_SPEED*0.55 && raceTime-o.lastNearMiss>1.0){
       o.lastNearMiss = raceTime;
-      addTrick('Опасный пролёт!', 30);
+      if(hasPerk(player,'slicer')){ addTrick('Опасный пролёт!', 60); player.dashTime = 0.8; }
+      else addTrick('Опасный пролёт!', 30);
       player.nearMissCount++;
     }
   }
@@ -568,7 +595,7 @@ function endRace(){
   if(total===1) placementBonus=40;
   else if(total===2) placementBonus = place===1?70:25;
   else placementBonus = place===1?80: place===2?45:20;
-  const earned = 20 + Math.round(player.trickScore*0.5) + placementBonus;
+  const earned = perkCredits(20 + Math.round(player.trickScore*0.5) + placementBonus);
   SAVE.credits += earned;
 
   const trackId = getAllTracks()[selectedTrackIdx].id;
@@ -637,7 +664,7 @@ function endRace(){
 
 /* The player's hull gave out before the finish line: no place, no record, only a small consolation payout */
 function endWreckedRace(){
-  const earned = 10 + Math.round(player.trickScore*0.25);
+  const earned = perkCredits(10 + Math.round(player.trickScore*0.25));
   SAVE.credits += earned;
   const st = SAVE.stats;
   st.totalRaces++;
@@ -679,7 +706,7 @@ function endArenaMatch(playerWon){
   input.fireHeld=false;
   stopEngineSound();
 
-  const earned = playerWon ? 90 : 25;
+  const earned = perkCredits(playerWon ? 90 : 25);
   SAVE.credits += earned;
 
   const rivalScore = aiShips[0].arenaScore;

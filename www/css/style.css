@@ -154,7 +154,8 @@ button{font-family:inherit;}
 
 /* ---------- Tuning ---------- */
 #tuning-ship-canvas{display:block; margin:0 auto 6px; image-rendering:pixelated;}
-#tuning-ship-name{font-family:var(--px-font); font-size:14px; color:var(--teal); margin-bottom:16px;}
+#tuning-ship-name{font-family:var(--px-font); font-size:14px; color:var(--teal); margin-bottom:6px;}
+#tuning-ship-perk{font-family:var(--px-body); font-size:14px; color:var(--gold); margin-bottom:16px; line-height:1.25;}
 #tuning-rows, #tuning-appearance-rows{width:min(100%,380px); display:flex; flex-direction:column; gap:10px; padding-bottom:20px;}
 .upgrade-row{background:var(--panel); border:2px solid var(--panel-b); padding:10px 14px; box-shadow:2px 2px 0 rgba(0,0,0,.35);}
 .upgrade-row-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
@@ -293,6 +294,7 @@ button{font-family:inherit;}
 .ship-card .sdesc, .track-card .tdesc{font-family:var(--px-body); font-size:12px; color:var(--dim); margin-top:3px; line-height:1.2; overflow-wrap:break-word;}
 .track-card .tdesc{font-size:14px;}
 .track-card .tmeta{font-family:var(--px-body); font-size:13px; color:var(--gold); margin-top:3px; letter-spacing:.5px;}
+.ship-card .sperk{font-family:var(--px-font); font-size:7px; color:var(--gold); margin-top:6px; letter-spacing:.5px; text-transform:uppercase;}
 .ship-card .sprice{font-family:var(--px-font); font-size:10px; color:var(--gold); margin-top:5px;}
 .ship-card .lock-badge{
   position:absolute; top:6px; right:8px; width:11px; height:9px;
@@ -322,6 +324,7 @@ button{font-family:inherit;}
   font-family:var(--px-font); font-size:min(16vw,100px); color:var(--teal);
   text-shadow:6px 6px 0 rgba(0,0,0,.5);
 }
+#countdown-text.long{font-size:min(12vw,80px); white-space:nowrap;}
 
 /* ---------- HUD ---------- */
 #hud{position:absolute; top:0; left:0; right:0; padding:10px 12px; pointer-events:none; z-index:2;}
