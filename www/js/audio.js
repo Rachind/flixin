@@ -143,6 +143,28 @@ function applyAudioSettings(){
   musicGain.gain.value = SAVE.settings.musicVol;
   sfxGain.gain.value = SAVE.settings.sfxVol;
 }
+/* Inside the Android app navigator.vibrate does nothing in the WebView, so go through the
+   native @capacitor/haptics plugin there. It only takes a single duration, so patterns
+   ([on, off, on, ...]) are played as a chain of timed pulses. */
+let hapticTimers = [];
+function nativeHapticsAvailable(){
+  return !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()
+    && Capacitor.nativePromise);
+}
+function nativeVibrate(ms){
+  try{ Capacitor.nativePromise('Haptics', 'vibrate', {duration: Math.max(1, Math.round(ms))}).catch(()=>{}); }catch(e){}
+}
 function hapticPulse(ms){
+  if(nativeHapticsAvailable()){
+    for(const t of hapticTimers) clearTimeout(t);
+    hapticTimers = [];
+    if(!Array.isArray(ms)){ nativeVibrate(ms); return; }
+    let at = 0;
+    ms.forEach((d, i)=>{
+      if(i%2===0 && d>0) hapticTimers.push(setTimeout(()=>nativeVibrate(d), at));
+      at += d;
+    });
+    return;
+  }
   try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){}
 }

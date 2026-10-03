@@ -41,7 +41,7 @@ function makeShip(isPlayer, skin, name){
     finished:false, finishTime:0,
     aiWeaveSeed: Math.random()*100,
     aiSpeedVar: 0.9+Math.random()*0.22,
-    lastWallSpark:-99,
+    lastWallSpark:-99, lastTurbHaptic:-99,
     aiAvoidLateral:0,
     crateCount:0, nearMissCount:0, overtakeCount:0, hadCollision:false,
     isRival:false,
@@ -434,6 +434,12 @@ function updatePlayer(dt){
     const force = Math.sin(raceTime*8 + 3.1) * 260 + (Math.random()-0.5)*180;
     vx += n.x*force*dt*6;
     vy += n.y*force*dt*6;
+    // the ship is buffeted: light continuous camera shake plus irregular short buzzes
+    shakeTime = Math.max(shakeTime, 0.09 + Math.random()*0.05);
+    if(raceTime - player.lastTurbHaptic > 0.14 + Math.random()*0.12){
+      player.lastTurbHaptic = raceTime;
+      hapticPulse(18 + Math.floor(Math.random()*22));
+    }
   }
 
   let nx = player.x + vx*dt;
