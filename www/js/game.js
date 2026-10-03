@@ -185,7 +185,7 @@ document.getElementById('start-btn').addEventListener('click', ()=>{
   hudEl.classList.remove('hidden');
   joyZoneEl.classList.remove('hidden');
   fireBtnEl.classList.toggle('hidden', raceMode!=='pvp');
-  startMusic('race');
+  stopMusic(); // race music starts when the countdown ends (frame() in main.js)
   if(!SAVE.seenTutorial){ showTutorial(); } else { startCountdown(); }
 });
 document.getElementById('retry-btn').addEventListener('click', ()=>{
@@ -195,7 +195,7 @@ document.getElementById('retry-btn').addEventListener('click', ()=>{
   hudEl.classList.remove('hidden');
   joyZoneEl.classList.remove('hidden');
   fireBtnEl.classList.toggle('hidden', raceMode!=='pvp');
-  startMusic('race');
+  stopMusic(); // race music starts when the countdown ends (frame() in main.js)
   startCountdown();
 });
 document.getElementById('menu-btn').addEventListener('click', ()=>{ playSfx('ui'); goToMenu(); });

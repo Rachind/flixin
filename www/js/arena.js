@@ -436,9 +436,10 @@ function updatePlayer(dt){
     vy += n.y*force*dt*6;
     // the ship is buffeted: light continuous camera shake plus irregular short buzzes
     shakeTime = Math.max(shakeTime, 0.09 + Math.random()*0.05);
-    if(raceTime - player.lastTurbHaptic > 0.14 + Math.random()*0.12){
+    // pulses under ~40ms are too short for many phone vibration motors to spin up and be felt
+    if(raceTime - player.lastTurbHaptic > 0.2 + Math.random()*0.15){
       player.lastTurbHaptic = raceTime;
-      hapticPulse(18 + Math.floor(Math.random()*22));
+      hapticPulse(45 + Math.floor(Math.random()*35));
     }
   }
 

@@ -104,7 +104,7 @@ const MUSIC_SCALES = {
    the WebAudio graph: createMediaElementSource outputs silence for file:// pages), so its
    volume is set directly from the music slider, scaled down to sit under the SFX. */
 const RACE_MUSIC_SRC = 'audio/race.mp3';
-const RACE_MUSIC_LEVEL = 0.35;
+const RACE_MUSIC_LEVEL = 0.25;
 let raceMusic=null;
 function raceMusicVolume(){ return Math.min(1, SAVE.settings.musicVol*RACE_MUSIC_LEVEL); }
 function startRaceMusic(){

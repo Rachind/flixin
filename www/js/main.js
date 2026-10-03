@@ -29,6 +29,7 @@ function frame(now){
         countdownEl.classList.add('hidden');
         if(raceMode==='pvp'){ clearAiMarkers(); } else { clearAiMarkers(); ensureAiMarkers(); }
         STATE='racing';
+        startMusic('race');
       }
     }
     if(raceMode==='pvp') renderArena(); else render();
