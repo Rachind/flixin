@@ -1,6 +1,6 @@
 "use strict";
 
-/* ---------------- Audio engine (synthesised — no external files) ---------------- */
+/* ---------------- Audio engine (synthesised, except the looped in-race music track) ---------------- */
 let audioCtx=null, masterGain, musicGain, sfxGain;
 let engineOsc=null, engineFilter=null, engineGain=null;
 function ensureAudio(){
@@ -98,13 +98,26 @@ function updateEngineSound(speed, maxSpeed){
 }
 
 const MUSIC_SCALES = {
-  nebula:{notes:[220,246.94,261.63,329.63,392.00,440], tempo:0.42, wave:'triangle'},
-  canyon:{notes:[196,220,246.94,293.66,349.23,392], tempo:0.30, wave:'sawtooth'},
-  core:  {notes:[233.08,277.18,311.13,349.23,415.30,466.16], tempo:0.24, wave:'square'},
-  void:  {notes:[174.61,207.65,220,261.63,311.13,349.23], tempo:0.36, wave:'sine'},
-  storm: {notes:[207.65,233.08,277.18,311.13,349.23,415.30], tempo:0.20, wave:'sawtooth'},
   menu:  {notes:[261.63,329.63,392.00,440,523.25], tempo:0.5, wave:'triangle'},
 };
+/* In-race music is a looped mp3 played through a plain <audio> element (not routed into
+   the WebAudio graph: createMediaElementSource outputs silence for file:// pages), so its
+   volume is set directly from the music slider, scaled down to sit under the SFX. */
+const RACE_MUSIC_SRC = 'audio/race.mp3';
+const RACE_MUSIC_LEVEL = 0.35;
+let raceMusic=null;
+function raceMusicVolume(){ return Math.min(1, SAVE.settings.musicVol*RACE_MUSIC_LEVEL); }
+function startRaceMusic(){
+  if(!raceMusic){ raceMusic = new Audio(RACE_MUSIC_SRC); raceMusic.loop = true; raceMusic.preload = 'auto'; }
+  raceMusic.volume = raceMusicVolume();
+  raceMusic.currentTime = 0;
+  raceMusic.play().catch(()=>{});
+}
+function stopRaceMusic(){ if(raceMusic) raceMusic.pause(); }
+document.addEventListener('visibilitychange', ()=>{
+  if(!raceMusic || currentMusicKey!=='race') return;
+  if(document.hidden) raceMusic.pause(); else raceMusic.play().catch(()=>{});
+});
 let musicScheduler=null, musicNoteIdx=0, currentMusicKey=null;
 function playMusicNote(freq, duration, wave){
   if(!audioCtx) return;
@@ -120,9 +133,10 @@ function playMusicNote(freq, duration, wave){
 }
 function startMusic(key){
   if(!ensureAudio()) return;
-  if(currentMusicKey===key && musicScheduler) return;
+  if(currentMusicKey===key && (musicScheduler || key==='race')) return;
   stopMusic();
   currentMusicKey=key;
+  if(key==='race'){ startRaceMusic(); return; }
   const scale = MUSIC_SCALES[key]||MUSIC_SCALES.menu;
   musicNoteIdx=0;
   const step=()=>{
@@ -136,9 +150,11 @@ function startMusic(key){
 }
 function stopMusic(){
   if(musicScheduler){ clearInterval(musicScheduler); musicScheduler=null; }
+  stopRaceMusic();
   currentMusicKey=null;
 }
 function applyAudioSettings(){
+  if(raceMusic) raceMusic.volume = raceMusicVolume();
   if(!audioCtx) return;
   musicGain.gain.value = SAVE.settings.musicVol;
   sfxGain.gain.value = SAVE.settings.sfxVol;

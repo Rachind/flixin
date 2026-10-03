@@ -185,7 +185,7 @@ document.getElementById('start-btn').addEventListener('click', ()=>{
   hudEl.classList.remove('hidden');
   joyZoneEl.classList.remove('hidden');
   fireBtnEl.classList.toggle('hidden', raceMode!=='pvp');
-  startMusic(getAllTracks()[selectedTrackIdx].id);
+  startMusic('race');
   if(!SAVE.seenTutorial){ showTutorial(); } else { startCountdown(); }
 });
 document.getElementById('retry-btn').addEventListener('click', ()=>{
@@ -195,7 +195,7 @@ document.getElementById('retry-btn').addEventListener('click', ()=>{
   hudEl.classList.remove('hidden');
   joyZoneEl.classList.remove('hidden');
   fireBtnEl.classList.toggle('hidden', raceMode!=='pvp');
-  startMusic(getAllTracks()[selectedTrackIdx].id);
+  startMusic('race');
   startCountdown();
 });
 document.getElementById('menu-btn').addEventListener('click', ()=>{ playSfx('ui'); goToMenu(); });
