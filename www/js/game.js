@@ -265,20 +265,42 @@ document.getElementById('tutorial-ok').addEventListener('click', ()=>{
 });
 
 /* ---------------- Update ---------------- */
+/* Race bots fly by the same rules as the player: they accelerate, hit the same top speed
+   (scaled toward the player's upgraded ship so races stay close), and can draft — sit in
+   someone's wake to charge a slipstream and get the boost. */
+const AI_SLIP_RANGE = 150, AI_SLIP_LANE = 75;
+const AI_DRAFT_SEEK = 420;      // how far ahead a bot looks for someone to tuck in behind
 function updateAI(sh, dt){
   const stats = sh.skin.stats;
-  const baseSpeed = 380 * sh.aiSpeedVar * stats.speed;
+  const pStats = getEffectiveStats(player.skin);
+  // mostly match the player's (upgraded) ship, keep a bit of the bot's own ship character
+  const speedStat = lerp(stats.speed, pStats.speed, 0.7);
+  const accelStat = lerp(stats.accel, pStats.accel, 0.7);
 
-  // rubber-band: fall behind -> AI speeds up a little, get too far ahead -> AI eases off
-  // a PVP rival sticks closer and pushes harder, for a real head-to-head duel feel
+  // gentle rubber-band only, so bots win or lose on racing, not on cheating
   const gap = player.progress - sh.progress; // positive = AI is behind player
-  const rubberBand = sh.isRival
-    ? clamp(1 + gap/2200*0.22, 0.92, 1.24)
-    : clamp(1 + gap/3200*0.18, 0.86, 1.18);
+  const rubberBand = clamp(1 + gap/4000*0.08, 0.95, 1.06);
+
+  // slipstream: same detection as the player's, against every other ship (the player included)
+  let draftGap = Infinity, seekTarget = null, seekGap = Infinity;
+  for(const other of ships){
+    if(other===sh || other.destroyed) continue;
+    const diff = other.progress - sh.progress;
+    if(diff<=0) continue;
+    if(diff<AI_SLIP_RANGE && Math.abs(other.lateral - sh.lateral)<AI_SLIP_LANE) draftGap = Math.min(draftGap, diff);
+    if(diff<AI_DRAFT_SEEK && diff<seekGap){ seekGap = diff; seekTarget = other; }
+  }
+  if(draftGap<Infinity) sh.slipTimer = Math.min(sh.slipTimer+dt, 2);
+  else sh.slipTimer = Math.max(sh.slipTimer-dt*1.6, 0);
+  sh.slipActive = sh.slipTimer > 0.55;
 
   const inTurb = turbulenceAt(sh.progress);
-  const spd = (inTurb ? baseSpeed*0.82 : baseSpeed) * rubberBand;
-  sh.progress = clamp(sh.progress + spd*dt, 0, TOTAL_LENGTH);
+  // bots take the racing line through the centre while the player cuts corners and weaves,
+  // so their top speed sits slightly under the player's to keep things even
+  const top = (sh.slipActive ? BOOST_SPEED : MAX_SPEED*0.93) * speedStat * sh.aiSpeedVar * rubberBand;
+  const targetSpeed = inTurb ? top*0.88 : top;
+  sh.speed = lerp(sh.speed, targetSpeed, clamp(ACCEL_RATE*accelStat*dt,0,1));
+  sh.progress = clamp(sh.progress + sh.speed*dt, 0, TOTAL_LENGTH);
 
   // basic obstacle avoidance: look a bit ahead and steer away from solid pylons
   let avoidTarget = 0;
@@ -294,8 +316,19 @@ function updateAI(sh, dt){
   }
   sh.aiAvoidLateral = lerp(sh.aiAvoidLateral, avoidTarget, clamp(dt*4,0,1));
 
+  // pick a line: tuck in behind the ship ahead to draft, otherwise a lazy weave
   const weave = Math.sin(raceTime*1.3 + sh.aiWeaveSeed) * (TRACK_HALF_WIDTH*0.35);
-  sh.lateral = clamp(weave + sh.aiAvoidLateral, -(TRACK_HALF_WIDTH-28), TRACK_HALF_WIDTH-28);
+  let desiredLat = weave;
+  if(seekTarget){
+    desiredLat = seekTarget.lateral;
+    // right on its tail: pull out to the side with more room and slingshot past
+    if(seekGap<90) desiredLat += seekTarget.lateral>0 ? -70 : 70;
+  }
+  const maxLat = TRACK_HALF_WIDTH-28;
+  const targetLat = clamp(desiredLat + sh.aiAvoidLateral, -maxLat, maxLat);
+  // lateral moves are rate-limited by handling, like a real ship turning
+  const latRate = 260 * stats.handling;
+  sh.lateral = clamp(sh.lateral + clamp(targetLat - sh.lateral, -latRate*dt, latRate*dt), -maxLat, maxLat);
   const tp = trackPointAt(sh.progress);
   sh.x = tp.pos.x + tp.normal.x*sh.lateral;
   sh.y = tp.pos.y + tp.normal.y*sh.lateral;
@@ -308,8 +341,12 @@ function updateAI(sh, dt){
     if(!o.alive || !o.destructible) continue;
     if(Math.hypot(sh.x-o.x, sh.y-o.y) < o.r+SHIP_RADIUS*0.7){
       o.alive=false;
+      sh.speed *= 0.9; // same slowdown the player gets from smashing a crate
       spawnParticles(o.x,o.y,10,{spread:Math.PI*2, minSpeed:50, speedRange:90, life:0.45, size:3, color:'#3ddbd0'});
     }
+  }
+  if(sh.slipActive && Math.random()<dt*30){
+    spawnParticles(sh.x,sh.y,1,{spread:Math.PI*2, minSpeed:10, speedRange:30, life:0.5, size:2.5, color:'#3ddbd0'});
   }
 
   if(Math.random()<dt*14){

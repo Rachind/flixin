@@ -79,7 +79,9 @@ function resetRace(){
     aiShips.push(rival);
   } else for(let i=0;i<SAVE.bots;i++){
     const aiSkin = SKINS[(selectedSkinIdx+1+i*2)%SKINS.length];
-    aiShips.push(makeShip(false, aiSkin, AI_NAMES[i%AI_NAMES.length]));
+    const bot = makeShip(false, aiSkin, AI_NAMES[i%AI_NAMES.length]);
+    bot.aiSpeedVar = 0.96+Math.random()*0.06; // a tight spread so every bot is a real contender
+    aiShips.push(bot);
   }
   ships = [player, ...aiShips];
   // the player's hull depends on their (upgraded) durability; the duel rival's on its ship's base stat.
@@ -461,13 +463,20 @@ function updatePlayer(dt){
 
   let proj = projectToTrack(nx,ny);
 
-  if(Math.abs(proj.lateral) > TRACK_HALF_WIDTH-SHIP_RADIUS*0.4){
-    const sign = Math.sign(proj.lateral)||1;
-    const clampedLat = sign*(TRACK_HALF_WIDTH-SHIP_RADIUS*0.4);
-    const tp = trackPointAt(proj.progress);
-    nx = tp.pos.x + tp.normal.x*clampedLat;
-    ny = tp.pos.y + tp.normal.y*clampedLat;
-    const impactSpeed = Math.abs(vx*tp.normal.x + vy*tp.normal.y); // speed into the wall, not along it
+  const wallMargin = SHIP_RADIUS*0.4;
+  const hitSideWall = Math.abs(proj.lateral) > TRACK_HALF_WIDTH-wallMargin;
+  // invisible wall across the start line: flying back past the start is blocked like a normal wall
+  const hitStartWall = proj.segIndex===0 && proj.tproj < wallMargin;
+  if(hitSideWall || hitStartWall){
+    const tp = trackPointAt(Math.max(proj.progress, wallMargin));
+    const lat = clamp(proj.lateral, -(TRACK_HALF_WIDTH-wallMargin), TRACK_HALF_WIDTH-wallMargin);
+    nx = tp.pos.x + tp.normal.x*lat;
+    ny = tp.pos.y + tp.normal.y*lat;
+    // speed into the wall, not along it
+    const impactSpeed = Math.max(
+      hitSideWall ? Math.abs(vx*tp.normal.x + vy*tp.normal.y) : 0,
+      hitStartWall ? Math.max(0, -(vx*tp.dir.x + vy*tp.dir.y)) : 0
+    );
     const durabilityRelief = 1 - clamp((stats.durability-1)*0.5, -0.3, 0.5);
     const armor = hasPerk(player,'armor');
     player.speedPenalty = Math.min(player.speedPenalty, armor ? 0.85 : clamp(0.5*durabilityRelief,0.25,0.85));
